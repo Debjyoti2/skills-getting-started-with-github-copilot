@@ -21,23 +21,28 @@ document.addEventListener("DOMContentLoaded", () => {
         const spotsLeft = details.max_participants - details.participants.length;
 
         // Create participants list HTML
-        let participantsHTML = "";
-        if (details.participants && details.participants.length > 0) {
-          participantsHTML = `
-            <div class="participants-section">
-              <strong>Participants (${details.participants.length}):</strong>
-              <ul class="participants-list">
-                ${details.participants.map(email => `<li>${email}</li>`).join("")}
-              </ul>
-            </div>
-          `;
-        } else {
-          participantsHTML = `
-            <div class="participants-section empty">
-              <em>No participants yet.</em>
-            </div>
-          `;
-        }
+          let participantsHTML = "";
+          if (details.participants && details.participants.length > 0) {
+            participantsHTML = `
+              <div class="participants-section">
+                <strong>Participants (${details.participants.length}):</strong>
+                <ul class="participants-list">
+                  ${details.participants.map(email => `
+                    <li class="participant-item" data-activity="${name}" data-email="${email}">
+                      <span class="participant-email">${email}</span>
+                      <span class="delete-participant" title="Remove participant">&times;</span>
+                    </li>
+                  `).join("")}
+                </ul>
+              </div>
+            `;
+          } else {
+            participantsHTML = `
+              <div class="participants-section empty">
+                <em>No participants yet.</em>
+              </div>
+            `;
+          }
 
         activityCard.innerHTML = `
           <h4>${name}</h4>
@@ -59,6 +64,31 @@ document.addEventListener("DOMContentLoaded", () => {
       activitiesList.innerHTML = "<p>Failed to load activities. Please try again later.</p>";
       console.error("Error fetching activities:", error);
     }
+        // Add event listeners for delete icons
+        document.querySelectorAll(".delete-participant").forEach(icon => {
+          icon.addEventListener("click", async (e) => {
+            const li = e.target.closest(".participant-item");
+            const activity = li.getAttribute("data-activity");
+            const email = li.getAttribute("data-email");
+            if (!activity || !email) return;
+
+            // Call backend to unregister participant
+            try {
+              const response = await fetch(`/activities/${encodeURIComponent(activity)}/unregister?email=${encodeURIComponent(email)}`, {
+                method: "POST",
+              });
+              if (response.ok) {
+                // Refresh activities list
+                fetchActivities();
+              } else {
+                const result = await response.json();
+                alert(result.detail || "Failed to remove participant.");
+              }
+            } catch (error) {
+              alert("Failed to remove participant. Please try again.");
+            }
+          });
+        });
   }
 
   // Handle form submission
@@ -82,6 +112,7 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+        fetchActivities(); // Refresh activities list to show new participant
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
